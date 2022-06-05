@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"github.com/qpliu/qrencode-go/qrencode"
@@ -11,11 +12,13 @@ import (
 	"os"
 	"os/exec"
 	"text/template"
+	"time"
 )
 
 type server struct {
-	tmpl  *template.Template
-	param *renderParam
+	tmpl   *template.Template
+	param  *renderParam
+	server *http.Server
 }
 
 type renderParam struct {
@@ -33,7 +36,14 @@ func (s *server) handler(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) serve() {
 	http.HandleFunc("/", s.handler)
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	s.server = &http.Server{Addr: ":8080", Handler: nil}
+	if err := s.server.ListenAndServe(); err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func (s *server) shutdown() {
+	if err := s.server.Shutdown(context.Background()); err != nil {
 		log.Fatalln(err)
 	}
 }
@@ -76,5 +86,11 @@ func main() {
 		},
 	}
 	fmt.Println("Starting the web server...")
+	timer := time.NewTimer(3 * time.Minute)
+	go func() {
+		<-timer.C
+		fmt.Println("Closing the web server...")
+		s.shutdown()
+	}()
 	s.serve()
 }
