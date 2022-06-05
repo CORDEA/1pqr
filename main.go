@@ -13,6 +13,7 @@ import (
 )
 
 type server struct {
+	rawPass  string
 	base64Qr string
 }
 
@@ -20,15 +21,16 @@ func (s *server) buildHtml(content string) string {
 	font := "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">" +
 		"<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>" +
 		"<link href=\"https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap\" rel=\"stylesheet\">"
-	style := "style=\"text-align: center;margin: 16px;\""
+	style := "style=\"text-align: center;margin: 16px;font-family: 'Roboto Mono', monospace;\""
 	return fmt.Sprintf("<html><head>%s</head><body %s>%s</body></html>", font, style, content)
 }
 
 func (s *server) handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Detected access!")
 	fmt.Println(r.Header.Get("User-Agent"))
+	p := fmt.Sprintf("<h2 style=\"margin-top: 32px;\">%s</h2>", s.rawPass)
 	img := fmt.Sprintf("<img src=\"data:image/png;base64,%s\" />", s.base64Qr)
-	html := s.buildHtml(img)
+	html := s.buildHtml(fmt.Sprintf("<div>%s%s</div>", p, img))
 	if _, err := fmt.Fprint(w, html); err != nil {
 		log.Fatalln(err)
 	}
@@ -52,7 +54,8 @@ func main() {
 	if err := cmd.Run(); err != nil {
 		log.Fatalln(err)
 	}
-	qr, err := qrencode.Encode(out.String(), qrencode.ECLevelQ)
+	pass := out.String()
+	qr, err := qrencode.Encode(pass, qrencode.ECLevelQ)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -65,6 +68,9 @@ func main() {
 	}
 	b64 := base64.StdEncoding.EncodeToString(img.Bytes())
 
-	s := server{base64Qr: b64}
+	s := server{
+		rawPass:  pass,
+		base64Qr: b64,
+	}
 	s.serve()
 }
