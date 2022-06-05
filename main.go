@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/qpliu/qrencode-go/qrencode"
 	"log"
 	"net/http"
 	"os"
@@ -28,6 +29,11 @@ func main() {
 	if err := cmd.Run(); err != nil {
 		log.Fatalln(err)
 	}
+	qr, err := qrencode.Encode(out.String(), qrencode.ECLevelQ)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Println(qr.String())
 
 	fmt.Println("Starting the web server...")
 	http.HandleFunc("/", handler)
