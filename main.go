@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"github.com/qpliu/qrencode-go/qrencode"
+	"image/png"
 	"log"
 	"net/http"
 	"os"
@@ -11,7 +13,7 @@ import (
 )
 
 type server struct {
-	qr string
+	base64Qr string
 }
 
 func (s *server) buildHtml(content string) string {
@@ -25,7 +27,8 @@ func (s *server) buildHtml(content string) string {
 func (s *server) handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Detected access!")
 	fmt.Println(r.Header.Get("User-Agent"))
-	html := s.buildHtml(fmt.Sprintf("<pre>%s</pre>", s.qr))
+	img := fmt.Sprintf("<img src=\"data:image/png;base64,%s\" />", s.base64Qr)
+	html := s.buildHtml(img)
 	if _, err := fmt.Fprint(w, html); err != nil {
 		log.Fatalln(err)
 	}
@@ -55,6 +58,13 @@ func main() {
 	}
 
 	fmt.Println("Starting the web server...")
-	s := server{qr: qr.String()}
+	raw := qr.Image(8)
+	var img bytes.Buffer
+	if err := png.Encode(&img, raw); err != nil {
+		log.Fatalln(err)
+	}
+	b64 := base64.StdEncoding.EncodeToString(img.Bytes())
+
+	s := server{base64Qr: b64}
 	s.serve()
 }
