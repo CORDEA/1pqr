@@ -10,28 +10,23 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"text/template"
 )
 
 type server struct {
-	rawPass  string
-	base64Qr string
+	tmpl  *template.Template
+	param *renderParam
 }
 
-func (s *server) buildHtml(content string) string {
-	font := "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">" +
-		"<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>" +
-		"<link href=\"https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap\" rel=\"stylesheet\">"
-	style := "style=\"text-align: center;margin: 16px;font-family: 'Roboto Mono', monospace;\""
-	return fmt.Sprintf("<html><head>%s</head><body %s>%s</body></html>", font, style, content)
+type renderParam struct {
+	Value string
+	Image string
 }
 
 func (s *server) handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Detected access!")
 	fmt.Println(r.Header.Get("User-Agent"))
-	p := fmt.Sprintf("<h2 style=\"margin-top: 32px;\">%s</h2>", s.rawPass)
-	img := fmt.Sprintf("<img src=\"data:image/png;base64,%s\" />", s.base64Qr)
-	html := s.buildHtml(fmt.Sprintf("<div>%s%s</div>", p, img))
-	if _, err := fmt.Fprint(w, html); err != nil {
+	if err := s.tmpl.Execute(w, s.param); err != nil {
 		log.Fatalln(err)
 	}
 }
@@ -60,17 +55,26 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	fmt.Println("Starting the web server...")
-	raw := qr.Image(8)
+	rawImg := qr.Image(8)
 	var img bytes.Buffer
-	if err := png.Encode(&img, raw); err != nil {
+	if err := png.Encode(&img, rawImg); err != nil {
 		log.Fatalln(err)
 	}
 	b64 := base64.StdEncoding.EncodeToString(img.Bytes())
 
-	s := server{
-		rawPass:  pass,
-		base64Qr: b64,
+	t := "template.html"
+	tmpl, err := template.New(t).ParseFiles(t)
+	if err != nil {
+		log.Fatalln(err)
 	}
+
+	s := server{
+		tmpl: tmpl,
+		param: &renderParam{
+			Value: pass,
+			Image: b64,
+		},
+	}
+	fmt.Println("Starting the web server...")
 	s.serve()
 }
